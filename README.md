@@ -22,8 +22,15 @@ Everything reaches Home Assistant through **MQTT discovery**, under one *Water m
 
 ## How it works
 
-```
-meter ──868 MHz──> RTL-SDR ──IQ──> rtl_sdr | rtl_wmbus ──frames──> wmbus_ha.py ──MQTT──> Home Assistant
+```mermaid
+flowchart LR
+    M["💧 Diehl Hydrus<br/>(encrypted wM-Bus)"] -- "868.95 MHz, every ~18 s" --> S["RTL-SDR dongle"]
+    subgraph PI["Raspberry Pi"]
+        S -- IQ --> R["rtl_sdr | rtl_wmbus"]
+        R -- "frames" --> W["wmbus_ha.py<br/>10 L steps · episodes"]
+    end
+    W -- "MQTT discovery" --> HA["🏠 Home Assistant<br/>index · flow · showers · alerts"]
+    HA -. "tank temperature (optional)" .-> W
 ```
 
 `wmbus_ha.py` reads rtl_wmbus output and applies a few rules, found empirically and validated
