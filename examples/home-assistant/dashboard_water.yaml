@@ -126,13 +126,13 @@ views:
                 name: Water
                 type: column
                 color: "#3b82f6"
-                statistics: { type: change, period: day, align: start }
+                statistics: { type: change, period: day, align: middle }
                 show: { datalabels: true }
 
           - type: markdown
             title: Recent episodes
             grid_options: { columns: full }
-            content: >
+            content: |
               {%- set eps = state_attr('sensor.water_meter_recent_episodes', 'episodes') or [] %}
               {%- if eps | count == 0 %}<i>No episodes yet – they show up a few minutes after water stops (at most 15).</i>
               {%- else %}
@@ -156,7 +156,7 @@ views:
             grid_options: { columns: full }
           - type: tile
             entity: input_boolean.water_away_mode
-            name: Away mode · any use = alert
+            name: Away mode
             icon: mdi:airplane
             color: red
             features: [{ type: toggle }]
@@ -182,7 +182,7 @@ views:
             grid_options: { columns: full, rows: 2 }
           - type: tile
             entity: number.water_meter_set_index
-            name: Recalibrate index · tap and type the meter reading
+            name: Set index (meter reading)
             icon: mdi:counter
             color: grey
             grid_options: { columns: full }

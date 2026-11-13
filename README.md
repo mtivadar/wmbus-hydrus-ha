@@ -17,6 +17,14 @@ encrypted payload changes in a recognisable way. From those steps you get:
 
 Everything reaches Home Assistant through **MQTT discovery**, under one *Water meter* device.
 
+<p align="center">
+  <img src="docs/dashboard-today.png" width="300" alt="Today: litres per 15 minutes, hot-water tank temperature and a detected shower">
+  &nbsp;&nbsp;
+  <img src="docs/dashboard-episodes-alerts.png" width="300" alt="Recent consumption episodes and alert settings">
+</p>
+<p align="center"><sub>The example dashboard from <a href="examples/home-assistant">examples/home-assistant</a>, on the first evening:
+water per 15 min, tank temperature (the dip at ~22:00 is a shower) and the episodes it was split into.</sub></p>
+
 > Developed on a Diehl Hydrus (T1 mode, 868.95 MHz). Other encrypted meters may behave
 > differently. Run [`replay.py`](#check-your-meter-first) on a capture of yours first.
 
