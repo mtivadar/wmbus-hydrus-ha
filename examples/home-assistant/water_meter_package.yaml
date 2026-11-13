@@ -1,0 +1,195 @@
+# Home Assistant package for wmbus-ha.
+#
+# Put it in config/packages/ and enable packages in configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Replace the two placeholders before use:
+#   sensor.hot_water_tank_temperature   -> your hot-water tank / cylinder temperature (optional)
+#   notify.mobile_app_your_phone        -> your notify service
+#
+# All the sensor.water_meter_* / binary_sensor.water_meter_* entities come from
+# wmbus_ha.py via MQTT discovery.
+
+# --- helpers ---------------------------------------------------------------
+
+input_boolean:
+  water_away_mode:
+    name: Water away mode
+    icon: mdi:airplane
+
+input_number:
+  water_alert_episode_liters:
+    name: Water alert episode liters
+    min: 50
+    max: 1000
+    step: 10
+    initial: 200
+    mode: box
+    unit_of_measurement: L
+    icon: mdi:water-alert
+  water_alert_flow_minutes:
+    name: Water alert flow minutes
+    min: 10
+    max: 180
+    step: 5
+    initial: 40
+    mode: box
+    unit_of_measurement: min
+    icon: mdi:timer-alert-outline
+  water_alert_no_pause_hours:
+    name: Water alert no pause hours
+    min: 1
+    max: 12
+    step: 0.5
+    initial: 3
+    mode: box
+    unit_of_measurement: h
+    icon: mdi:pipe-leak
+
+# Monthly consumption, reset on the 1st. Calibrate with utility_meter.calibrate
+# (value in LITRES, the source unit) if you know this month's consumption so far.
+utility_meter:
+  water_monthly:
+    name: Water monthly
+    source: sensor.water_meter_tracked_consumption
+    cycle: monthly
+
+template:
+  - sensor:
+      # The same in m3, independent of when the utility meter picks up its unit.
+      - name: Water this month
+        unique_id: water_this_month_m3
+        unit_of_measurement: "m³"
+        device_class: water
+        state_class: total
+        # Works whether the utility meter reports L or (after a display-unit change) m3.
+        state: >
+          {% set v = states('sensor.water_monthly') %}
+          {% set u = state_attr('sensor.water_monthly', 'unit_of_measurement') %}
+          {{ ((v | float) / (1000 if u == 'L' else 1)) | round(3) if is_number(v) else none }}
+
+# --- automations -------------------------------------------------------------
+
+automation:
+  # Feed the tank temperature to the Pi (hot-water hint for episode classification).
+  - id: water_meter_boiler_bridge
+    alias: Water meter – send hot water tank temperature to MQTT
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: sensor.hot_water_tank_temperature
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: /10
+    actions:
+      - action: mqtt.publish
+        data:
+          topic: wmbus/boiler/dhw_temp
+          payload: "{{ states('sensor.hot_water_tank_temperature') }}"
+          retain: true
+
+  # Consumption alerts. Notify only - nothing is switched off.
+  - id: water_consumption_alerts
+    alias: Water – consumption alerts
+    mode: queued
+    max: 10
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.water_meter_water_flowing
+        to: "on"
+        id: flow_start
+      - trigger: numeric_state
+        entity_id: sensor.water_meter_current_episode
+        above: input_number.water_alert_episode_liters
+        id: big_episode
+      - trigger: numeric_state
+        entity_id: sensor.water_meter_current_episode_duration
+        above: input_number.water_alert_flow_minutes
+        id: long_flow
+      - trigger: numeric_state
+        entity_id: sensor.water_meter_hours_without_pause
+        above: input_number.water_alert_no_pause_hours
+        id: no_pause
+      - trigger: template
+        id: no_signal
+        value_template: >
+          {% set t = states('sensor.water_meter_last_telegram') %}
+          {{ t not in ['unknown', 'unavailable', ''] and (now() - as_datetime(t)) > timedelta(minutes=30) }}
+      - trigger: state
+        entity_id: sensor.water_meter_index
+        to: unavailable
+        for: { minutes: 15 }
+        id: no_signal
+    actions:
+      - variables:
+          now_l: "{{ states('sensor.water_meter_current_episode') | int(0) }}"
+          now_min: "{{ states('sensor.water_meter_current_episode_duration') | float(0) | round(0) | int }}"
+          flow: "{{ states('sensor.water_meter_flow_rate') }}"
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: flow_start
+              - condition: state
+                entity_id: input_boolean.water_away_mode
+                state: "on"
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "💧 Water used while away"
+                  message: "Water started flowing while away mode is on."
+                  data: { priority: high, ttl: 0, tag: water_away }
+          - conditions:
+              - condition: trigger
+                id: flow_start
+              - condition: time
+                after: "01:00:00"
+                before: "05:00:00"
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "💧 Water used at night"
+                  message: "Water is flowing at {{ now().strftime('%H:%M') }}. If nobody is up, it may be a leak."
+                  data: { priority: high, ttl: 0, tag: water_night }
+          - conditions:
+              - condition: trigger
+                id: big_episode
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "💧 Large water use"
+                  message: >
+                    Current episode passed {{ states('input_number.water_alert_episode_liters') | int }} L:
+                    {{ now_l }} L in {{ now_min }} min ({{ flow }} L/min now).
+                  data: { priority: high, ttl: 0, tag: water_big }
+          - conditions:
+              - condition: trigger
+                id: long_flow
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "💧 Water flowing for a long time"
+                  message: "Flowing continuously for {{ now_min }} min ({{ now_l }} L). Something left open?"
+                  data: { priority: high, ttl: 0, tag: water_long }
+          - conditions:
+              - condition: trigger
+                id: no_pause
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "💧 Possible slow leak"
+                  message: >
+                    For {{ states('sensor.water_meter_hours_without_pause') }} h there was no full hour
+                    without consumption. A running toilet or a leaking pipe? If nothing runs indoors,
+                    check the yard - a leak before the indoor main valve can only be shut at the meter.
+                  data: { priority: high, ttl: 0, tag: water_leak }
+          - conditions:
+              - condition: trigger
+                id: no_signal
+            sequence:
+              - action: notify.mobile_app_your_phone
+                data:
+                  title: "📡 Water meter not received"
+                  message: "No telegram from the meter for over 30 min - consumption is not being tracked."
+                  data: { tag: water_signal }

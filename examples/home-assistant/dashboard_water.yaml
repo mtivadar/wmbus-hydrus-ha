@@ -1,0 +1,188 @@
+# Water dashboard (sections view) for wmbus-ha.
+# Needs: apexcharts-card (HACS). Paste into a new dashboard via
+# "Edit dashboard -> ⋮ -> Raw configuration editor".
+# Placeholder: sensor.hot_water_tank_temperature (remove those series if you have none).
+
+title: Water
+views:
+  - title: Water
+    path: water
+    icon: mdi:water
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Water consumption
+            icon: mdi:water
+
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: binary_sensor.water_meter_water_flowing
+                state: "on"
+            grid_options: { columns: full }
+            card:
+              type: markdown
+              text_only: true
+              content: >
+                <ha-alert alert-type="info">💧 <b>Water is flowing</b> –
+                {{ states('sensor.water_meter_current_episode') | int(0) }} L in
+                {{ states('sensor.water_meter_current_episode_duration') | float(0) | round(0) | int }} min ·
+                {{ states('sensor.water_meter_flow_rate') }} L/min</ha-alert>
+
+          - { type: tile, entity: sensor.water_meter_consumption_today, name: Today, icon: "mdi:calendar-today", color: blue, vertical: true }
+          - { type: tile, entity: sensor.water_this_month, name: This month, icon: "mdi:calendar-month", color: indigo, vertical: true }
+          - { type: tile, entity: sensor.water_meter_last_hour, name: Last hour, icon: "mdi:clock-outline", color: blue, vertical: true }
+          - { type: tile, entity: sensor.water_meter_flow_rate, name: Flow now, icon: "mdi:water-pump", color: light-blue, vertical: true }
+          - { type: tile, entity: sensor.water_meter_showers_today, name: Showers today, icon: "mdi:shower-head", color: cyan, vertical: true }
+          - { type: tile, entity: sensor.water_meter_index, name: Index, icon: "mdi:counter", color: grey, vertical: true }
+
+          # Today: litres per 15 min (from 5-minute statistics), tank temperature on the
+          # right axis, and markers for episodes >= 20 L (showers in teal, others grey).
+          - type: custom:apexcharts-card
+            grid_options: { columns: full }
+            graph_span: 24h
+            span: { start: day }
+            header: { show: true, title: Today, show_states: true, colorize_states: true }
+            now: { show: true, color: "rgba(127,127,127,0.45)" }
+            apex_config:
+              chart: { height: 270, fontFamily: inherit, toolbar: { show: false }, zoom: { enabled: false } }
+              grid: { borderColor: "rgba(127,127,127,0.15)", strokeDashArray: 3 }
+              legend: { show: true, position: top, horizontalAlign: left, fontSize: 12px }
+              plotOptions: { bar: { borderRadius: 2, columnWidth: 95% } }
+              fill: { opacity: 1 }
+              markers: { size: [0, 0, 8, 5], strokeWidth: 2, strokeColors: "#fff" }
+              tooltip: { x: { format: "HH:mm" }, shared: false, intersect: false }
+            yaxis:
+              - { id: l, min: 0, decimals: 0, apex_config: { tickAmount: 4, forceNiceScale: true, title: { text: "L / 15 min" } } }
+              - { id: t, opposite: true, min: "~40", max: "~65", decimals: 0, apex_config: { tickAmount: 4, title: { text: "tank °C" } } }
+            series:
+              - entity: sensor.water_meter_tracked_consumption
+                name: Water
+                type: column
+                yaxis_id: l
+                color: "#3b82f6"
+                statistics: { type: change, period: 5minute, align: start }
+                group_by: { func: sum, duration: 15min, fill: zero }
+                show: { in_header: false, legend_value: false }
+              - entity: sensor.hot_water_tank_temperature
+                name: Tank
+                type: line
+                curve: stepline
+                yaxis_id: t
+                color: "#f97316"
+                stroke_width: 2
+                extend_to: now
+                show: { in_header: false, legend_value: false }
+              - entity: sensor.water_meter_recent_episodes
+                name: Shower
+                type: line
+                yaxis_id: l
+                color: "#06b6d4"
+                stroke_width: 0
+                extend_to: false
+                show: { in_header: false, legend_value: false }
+                data_generator: |
+                  const S = ["shower", "long_shower", "dishes_or_short_shower"];
+                  return (entity.attributes.episodes || [])
+                    .filter(e => e.liters >= 20 && S.includes(e.type))
+                    .map(e => [new Date(e.start).getTime(), e.liters])
+                    .sort((a, b) => a[0] - b[0]);
+              - entity: sensor.water_meter_recent_episodes
+                name: Other large use
+                type: line
+                yaxis_id: l
+                color: "#94a3b8"
+                stroke_width: 0
+                extend_to: false
+                show: { in_header: false, legend_value: false }
+                data_generator: |
+                  const S = ["shower", "long_shower", "dishes_or_short_shower"];
+                  return (entity.attributes.episodes || [])
+                    .filter(e => e.liters >= 20 && !S.includes(e.type))
+                    .map(e => [new Date(e.start).getTime(), e.liters])
+                    .sort((a, b) => a[0] - b[0]);
+              - { entity: sensor.water_meter_consumption_today, name: today, color: "#3b82f6", show: { in_chart: false } }
+              - { entity: sensor.water_meter_showers_today, name: showers, color: "#06b6d4", show: { in_chart: false } }
+
+          - type: custom:apexcharts-card
+            grid_options: { columns: full }
+            graph_span: 14d
+            span: { end: day }
+            header: { show: true, title: Last 14 days }
+            apex_config:
+              chart: { height: 230, fontFamily: inherit, toolbar: { show: false }, zoom: { enabled: false } }
+              grid: { borderColor: "rgba(127,127,127,0.15)", strokeDashArray: 3 }
+              legend: { show: false }
+              fill: { opacity: 1 }
+              dataLabels: { enabled: true, offsetY: -18, style: { fontSize: 10px, colors: ["var(--secondary-text-color)"] } }
+              plotOptions: { bar: { borderRadius: 4, columnWidth: 60%, dataLabels: { position: top } } }
+            yaxis:
+              - { min: 0, decimals: 0, apex_config: { tickAmount: 4, forceNiceScale: true, title: { text: "L / day" } } }
+            series:
+              - entity: sensor.water_meter_tracked_consumption
+                name: Water
+                type: column
+                color: "#3b82f6"
+                statistics: { type: change, period: day, align: start }
+                show: { datalabels: true }
+
+          - type: markdown
+            title: Recent episodes
+            grid_options: { columns: full }
+            content: >
+              {%- set eps = state_attr('sensor.water_meter_recent_episodes', 'episodes') or [] %}
+              {%- if eps | count == 0 %}<i>No episodes yet – they show up a few minutes after water stops (at most 15).</i>
+              {%- else %}
+              | when | litres | minutes | looks like |
+              |:--|--:|--:|:--|
+              {%- for e in eps[:10] %}
+              | {{ (as_datetime(e.start) | as_local).strftime('%d.%m %H:%M') }} | {{ e.liters | int }} L | {{ e.duration_min | round(0) | int }} | {{ e.type | replace('_', ' ') }}{{ ' 🔥' if e.hot_water else '' }} |
+              {%- endfor %}
+
+              <small>🔥 = hot water used (tank dropped or reheated). The type is a guess from litres, duration and time of day.</small>
+              {%- endif %}
+
+          - { type: heading, heading: Water alerts, heading_style: subtitle, icon: "mdi:bell-ring-outline" }
+          - type: tile
+            entity: automation.water_consumption_alerts
+            name: Consumption alerts
+            icon: mdi:bell
+            color: green
+            features: [{ type: toggle }]
+            features_position: inline
+            grid_options: { columns: full }
+          - type: tile
+            entity: input_boolean.water_away_mode
+            name: Away mode · any use = alert
+            icon: mdi:airplane
+            color: red
+            features: [{ type: toggle }]
+            features_position: inline
+            grid_options: { columns: full }
+          - type: tile
+            entity: input_number.water_alert_episode_liters
+            name: Episode larger than
+            color: blue
+            features: [{ type: numeric-input, style: buttons }]
+            grid_options: { columns: full, rows: 2 }
+          - type: tile
+            entity: input_number.water_alert_flow_minutes
+            name: Flowing continuously for more than
+            color: blue
+            features: [{ type: numeric-input, style: buttons }]
+            grid_options: { columns: full, rows: 2 }
+          - type: tile
+            entity: input_number.water_alert_no_pause_hours
+            name: "Slow leak: no pause for more than"
+            color: blue
+            features: [{ type: numeric-input, style: buttons }]
+            grid_options: { columns: full, rows: 2 }
+          - type: tile
+            entity: number.water_meter_set_index
+            name: Recalibrate index · tap and type the meter reading
+            icon: mdi:counter
+            color: grey
+            grid_options: { columns: full }

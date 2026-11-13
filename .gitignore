@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+# your own captures - they contain your meter id (and maybe your neighbours')
+capture*.txt
+*.log
+state.json
+episodes.jsonl

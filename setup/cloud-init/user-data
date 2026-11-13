@@ -1,0 +1,17 @@
+#cloud-config
+# Copy over the `user-data` file on the `bootfs` partition of a freshly flashed
+# Raspberry Pi OS Lite card. Use straight quotes and spaces only (no tabs).
+hostname: wmbus
+manage_etc_hosts: true
+timezone: Etc/UTC            # e.g. Europe/Bucharest
+users:
+  - name: pi                 # pass the same name to setup/pi_setup.py --user
+    groups: users,adm,dialout,audio,netdev,video,plugdev,input,gpio,spi,i2c,render,sudo
+    shell: /bin/bash
+    lock_passwd: true        # SSH key only
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA...your-public-key... you@laptop
+ssh_pwauth: false
+runcmd:
+  - [systemctl, enable, --now, ssh]

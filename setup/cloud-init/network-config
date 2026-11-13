@@ -1,0 +1,14 @@
+# Optional: copy over `network-config` on the `bootfs` partition for Wi-Fi.
+# Not needed on Ethernet. Type the quotes on a real keyboard - "smart" quotes
+# pasted from chat apps end up inside the SSID and the Pi never connects.
+# Applied on FIRST boot only.
+network:
+  version: 2
+  wifis:
+    wlan0:
+      dhcp4: true
+      optional: true
+      regulatory-domain: US  # your country code, e.g. RO, DE, GB
+      access-points:
+        "YOUR_SSID":
+          password: "YOUR_WIFI_PASSWORD"
