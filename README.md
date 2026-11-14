@@ -1,7 +1,7 @@
 # wmbus-hydrus-ha
 
 Track an **encrypted** wireless M-Bus water meter in Home Assistant **without the AES key**,
-using a Raspberry Pi and a cheap RTL-SDR dongle.
+using a Raspberry Pi and an RTL-SDR dongle.
 
 Many utility water meters with a radio module broadcast encrypted telegrams. Without the key you cannot read the volume. This project counts the
 **10-litre steps** instead. Whenever the meter's volume register crosses a 10 L boundary, the
