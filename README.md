@@ -3,8 +3,7 @@
 Track an **encrypted** wireless M-Bus water meter in Home Assistant **without the AES key**,
 using a Raspberry Pi and a cheap RTL-SDR dongle.
 
-Most utility water meters with a radio module (Diehl Hydrus, Izar, …) broadcast encrypted
-telegrams. Without the key you cannot read the volume. This project counts the
+Many utility water meters with a radio module broadcast encrypted telegrams. Without the key you cannot read the volume. This project counts the
 **10-litre steps** instead. Whenever the meter's volume register crosses a 10 L boundary, the
 encrypted payload changes in a recognisable way. From those steps you get:
 
@@ -23,7 +22,7 @@ Everything reaches Home Assistant through **MQTT discovery**, under one *Water m
   <img src="docs/dashboard-episodes-alerts.png" width="300" alt="Recent consumption episodes and alert settings">
 </p>
 <p align="center"><sub>The example dashboard from <a href="examples/home-assistant">examples/home-assistant</a>, on the first evening:
-water per 15 min, tank temperature (the dip at ~22:00 is a shower) and the episodes it was split into.</sub></p>
+water per 15 min, tank temperature (the dip at ~22:00 is a shower) and the detected episodes.</sub></p>
 
 > Developed on a Diehl Hydrus (T1 mode, 868.95 MHz). Other encrypted meters may behave
 > differently. Run [`replay.py`](#check-your-meter-first) on a capture of yours first.
@@ -117,9 +116,7 @@ with a metal lid, so test reception (`Signal` and `Last telegram` entities) befo
 2. **Pre-configure** the card by replacing `user-data` (and `network-config` for Wi-Fi) on the
    `bootfs` partition with the files in [`setup/cloud-init/`](setup/cloud-init). Put in your SSH
    public key, and your SSID and password if you use Wi-Fi.
-   ⚠️ Type the quotes; don't paste them from a chat app. "Smart" quotes end up inside the SSID
-   and the Pi silently never joins. Cloud-init applies the network only on the **first** boot.
-3. **Boot** the Pi (Ethernet is the safest first time) and find its IP.
+3. **Boot** the Pi and find its IP.
 4. **Provision** it from your computer:
 
    ```bash

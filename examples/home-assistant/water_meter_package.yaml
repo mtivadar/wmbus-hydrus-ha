@@ -181,8 +181,7 @@ automation:
                   title: "💧 Possible slow leak"
                   message: >
                     For {{ states('sensor.water_meter_hours_without_pause') }} h there was no full hour
-                    without consumption. A running toilet or a leaking pipe? If nothing runs indoors,
-                    check the yard - a leak before the indoor main valve can only be shut at the meter.
+                    without consumption. A running toilet or a leaking pipe?
                   data: { priority: high, ttl: 0, tag: water_leak }
           - conditions:
               - condition: trigger

@@ -1,6 +1,6 @@
 #cloud-config
 # Copy over the `user-data` file on the `bootfs` partition of a freshly flashed
-# Raspberry Pi OS Lite card. Use straight quotes and spaces only (no tabs).
+# Raspberry Pi OS Lite card. YAML: indent with spaces, not tabs.
 hostname: wmbus
 manage_etc_hosts: true
 timezone: Etc/UTC            # e.g. Europe/Bucharest

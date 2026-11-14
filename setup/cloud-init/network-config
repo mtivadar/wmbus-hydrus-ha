@@ -1,7 +1,5 @@
 # Optional: copy over `network-config` on the `bootfs` partition for Wi-Fi.
-# Not needed on Ethernet. Type the quotes on a real keyboard - "smart" quotes
-# pasted from chat apps end up inside the SSID and the Pi never connects.
-# Applied on FIRST boot only.
+# Not needed on Ethernet.
 network:
   version: 2
   wifis:
