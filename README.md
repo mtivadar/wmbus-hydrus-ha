@@ -1,9 +1,9 @@
 # wmbus-hydrus-ha
 
-Track an **encrypted** wireless M-Bus water meter in Home Assistant **without the AES key**,
+Track an **encrypted** Diehl Hydrus water meter in Home Assistant **without the AES key**,
 using a Raspberry Pi and an RTL-SDR dongle.
 
-Many utility water meters with a radio module broadcast encrypted telegrams. Without the key you cannot read the volume. This project counts the
+The Diehl Hydrus water meter broadcasts encrypted wM-Bus telegrams. Without the key you cannot read the volume. This project counts the
 **10-litre steps** instead. Whenever the meter's volume register crosses a 10 L boundary, the
 encrypted payload changes in a recognisable way. From those steps you get:
 
@@ -24,8 +24,7 @@ Everything reaches Home Assistant through **MQTT discovery**, under one *Water m
 <p align="center"><sub>The example dashboard from <a href="examples/home-assistant">examples/home-assistant</a>, on the first evening:
 water per 15 min, tank temperature (the dip at ~22:00 is a shower) and the detected episodes.</sub></p>
 
-> Developed on a Diehl Hydrus (T1 mode, 868.95 MHz). Other encrypted meters may behave
-> differently. Run [`replay.py`](#check-your-meter-first) on a capture of yours first.
+> Tested only on a Diehl Hydrus (T1 mode, 868.95 MHz). See [Will it work with my meter?](#will-it-work-with-my-meter).
 
 ## How it works
 
@@ -62,24 +61,20 @@ your history.
 
 ## Will it work with my meter?
 
-The reception, MQTT, Home Assistant and episode parts are generic. **Step detection** relies on
-four properties of the Diehl Hydrus:
+**Tested only on the Diehl Hydrus.** The reception, MQTT, Home Assistant and episode parts are
+generic, but step detection relies on how the Hydrus behaves:
 
-1. **It repeats itself.** OMS encryption (AES-CBC, security mode 5) puts the access number into
-   the IV. The Hydrus sends the **same access number for many frames in a row**, so as long as
-   the volume doesn't change, the ciphertext is byte-for-byte identical. Many meters increment
-   the access number on **every** transmission. Then every frame looks new and this method
-   cannot work at all.
-2. **Volume is in the first AES block.** Volume is the first record in the Hydrus's decrypted
-   data, so "block 1 changed" means "volume changed". A meter that puts a date/time or a frame
-   counter first changes block 1 constantly, and you get phantom steps.
-3. **10 L resolution** (VIF `0x14`). A meter reporting whole litres would produce a "step" per
-   litre. `STEP_L` in `wmbus_ha.py` is fixed at 10.
-4. **Short header, CI `0x7A`.** Long-header (`0x72`) and compact/ELL frames, such as AES-CTR on
-   Kamstrup, are ignored, and the block logic doesn't apply to CTR mode anyway.
+1. **It repeats itself.** The access number is part of the encryption IV (AES-CBC), and the
+   Hydrus keeps the **same access number for many frames in a row**. As long as the volume
+   doesn't change, the ciphertext is byte-for-byte identical.
+2. **Volume is in the first AES block.** Volume is the first record of the Hydrus's data, so
+   "block 1 changed" means "volume changed".
+3. **10 L resolution.** Each change of the volume field is one 10 L step (`STEP_L` in
+   `wmbus_ha.py`).
+4. **Short header** (CI `0x7A`). The code reads the access number and the payload at the
+   positions this header uses; other frame layouts are ignored.
 
-Not needed for **Diehl Izar** meters: their PRIOS scrambling is weak, and
-[wmbusmeters](https://github.com/wmbusmeters/wmbusmeters) decodes the real volume without a key.
+If you try it on another meter, check these four points first with a capture of your own.
 
 **Test it** with a capture of your meter, taken while you use a known amount of water:
 
